@@ -175,11 +175,6 @@
       <div id="url-warning" class="url-warning" hidden></div>
 
       <div>
-        <label for="movil-id">Nombre o Patente del Móvil (opcional)</label>
-        <input id="movil-id" type="text" placeholder="Ej: Móvil 01 (o dejar vacío para QR general)" />
-      </div>
-
-      <div>
         <label for="card-title">Título en el cartel imprimible</label>
         <input id="card-title" type="text" value="Registro de Viaje" />
       </div>
@@ -193,7 +188,6 @@
 
     <section class="print-card" aria-label="Vista previa para imprimir">
       <h2 id="preview-title">Registro de Viaje</h2>
-      <span id="preview-movil" class="movil-tag" hidden></span>
       <div id="qr-container"></div>
       <p class="print-steps">
         <strong>1.</strong> Escanea este QR con la cámara de tu celular.<br />
@@ -207,11 +201,9 @@
   <script src="qrcode-local.js?v=3"></script>
   <script>
     const elBaseUrl = document.getElementById("base-url");
-    const elMovilId = document.getElementById("movil-id");
     const elCardTitle = document.getElementById("card-title");
     const elUrlWarning = document.getElementById("url-warning");
     const elPreviewTitle = document.getElementById("preview-title");
-    const elPreviewMovil = document.getElementById("preview-movil");
     const elPreviewUrl = document.getElementById("preview-url");
     const elQrContainer = document.getElementById("qr-container");
     const elDownloadBtn = document.getElementById("download-btn");
@@ -227,19 +219,14 @@
 
     function buildTargetUrl() {
       let base = (elBaseUrl.value || "").trim();
-      const movil = (elMovilId.value || "").trim();
       if (!base) return "";
       if (!/^https?:\/\//i.test(base)) {
         base = "https://" + base;
       }
       try {
-        const url = new URL(base);
-        if (movil) {
-          url.searchParams.set("movil", movil);
-        }
-        return url.toString();
+        return new URL(base).toString();
       } catch (_) {
-        return movil ? `${base}${base.includes("?") ? "&" : "?"}movil=${encodeURIComponent(movil)}` : base;
+        return base;
       }
     }
 
@@ -262,18 +249,10 @@
 
     function renderQR() {
       const targetUrl = buildTargetUrl();
-      const movil = (elMovilId.value || "").trim();
       elPreviewTitle.textContent = (elCardTitle.value || "Registro de Viaje").trim();
       elPreviewUrl.textContent = targetUrl;
       elTestLink.href = targetUrl || "#";
       updateUrlWarning(targetUrl);
-
-      if (movil) {
-        elPreviewMovil.textContent = movil;
-        elPreviewMovil.hidden = false;
-      } else {
-        elPreviewMovil.hidden = true;
-      }
 
       elQrContainer.innerHTML = "";
       if (!targetUrl) {
@@ -291,7 +270,6 @@
     }
 
     elBaseUrl.addEventListener("input", renderQR);
-    elMovilId.addEventListener("input", renderQR);
     elCardTitle.addEventListener("input", renderQR);
 
     elDownloadBtn.addEventListener("click", () => {
@@ -300,14 +278,7 @@
         alert("Primero genera un código QR válido.");
         return;
       }
-      const movil = (elMovilId.value || "general")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9-_]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-      const filename = `qr-marcacion-${movil || "general"}.png`;
+      const filename = "qr-marcacion.png";
 
       const triggerDownload = (href, revokeAfter) => {
         const link = document.createElement("a");

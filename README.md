@@ -9,7 +9,7 @@ Sistema autónomo 24/7 para el **registro individual de inicio y finalización d
 - **Fecha y hora automáticas**: Captura la fecha y hora exacta al momento de registrar.
 - **Funciona 24/7 sin depender de tu PC**: Se publica como sitio estático (ej. GitHub Pages) y cuenta con Service Worker + cola local para guardar marcaciones si el pasajero pierde señal momentáneamente y enviarlas apenas recupere conexión.
 - **Privacidad en SharePoint**: Los pasajeros no tienen acceso al SharePoint ni al Excel; el envío se realiza mediante un Webhook de Power Automate que escribe en el archivo privado del jefe.
-- **Generador de QR imprimible (`qr.html`)**: Crea e imprime el cartel con el QR (general o por móvil usando `?movil=M01`).
+- **Generador de QR imprimible (`qr.html`)**: Crea e imprime el cartel con el QR listo para pegar.
 
 ## Archivos del proyecto
 

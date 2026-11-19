@@ -9,8 +9,6 @@
   const elSubtitle = document.getElementById("app-subtitle");
   const elStatusBadge = document.getElementById("status-badge");
   const elStatusText = document.getElementById("status-text");
-  const elMovilBadge = document.getElementById("movil-badge");
-  const elMovilName = document.getElementById("movil-name");
   const elLiveDate = document.getElementById("live-date");
   const elLiveTime = document.getElementById("live-time");
 
@@ -45,11 +43,8 @@
   const elRecCC = document.getElementById("rec-cc");
   const elRecTipo = document.getElementById("rec-tipo");
   const elRecDatetime = document.getElementById("rec-datetime");
-  const elRecMovil = document.getElementById("rec-movil");
   const elNewRecordBtn = document.getElementById("new-record-btn");
 
-  const params = new URLSearchParams(window.location.search);
-  const movilName = (params.get("movil") || CFG.defaultMovil || "General").trim();
   const webhookUrl = (CFG.webhookUrl || "").trim();
 
   let isFlushing = false;
@@ -87,11 +82,6 @@
   function init() {
     if (CFG.appTitle) elTitle.textContent = CFG.appTitle;
     if (CFG.companySubtitle) elSubtitle.textContent = CFG.companySubtitle;
-
-    if (movilName) {
-      elMovilName.textContent = movilName;
-      elMovilBadge.hidden = false;
-    }
 
     elDemoBanner.hidden = webhookState.status !== "demo";
     if (webhookState.status === "incomplete") {
@@ -434,8 +424,9 @@
       tipo,
       fecha: ts.fechaISO,
       hora: ts.hora,
+      horaInicio: tipo === "Inicio" ? ts.hora : "",
+      horaFin: tipo === "Finalización" ? ts.hora : "",
       timestampISO: ts.timestampISO,
-      movil: movilName,
       sincronizadoDesde: "En línea"
     };
 
@@ -472,7 +463,6 @@
     elRecCC.textContent = record.centroCostos;
     elRecTipo.textContent = record.tipo;
     elRecDatetime.textContent = `${fechaDisplay} · ${record.hora}`;
-    elRecMovil.textContent = record.movil;
 
     if (queuedOffline) {
       elReceiptIcon.textContent = "⏳";

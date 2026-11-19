@@ -16,9 +16,6 @@ window.APP_CONFIG = {
   // Si la configuras aquí, agrégala también como condición en Power Automate.
   apiKey: "",
 
-  // Identificador por defecto si el QR no trae ?movil=... en la URL
-  defaultMovil: "General",
-
   // Lista opcional de Centros de Costos sugeridos (autocompletado).
   // Los pasajeros igual podrán escribir otro si `allowCustomCostCenter` es true.
   costCenters: [
