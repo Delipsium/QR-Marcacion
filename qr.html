@@ -165,7 +165,7 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="qrcode-local.js"></script>
   <script>
     const elBaseUrl = document.getElementById("base-url");
     const elMovilId = document.getElementById("movil-id");
@@ -177,11 +177,11 @@
     const elDownloadBtn = document.getElementById("download-btn");
     const elPrintBtn = document.getElementById("print-btn");
 
-    // Sugerir URL actual si no es file://
+    // Sugerir URL actual si está publicado, o la de GitHub Pages del repo
     if (window.location.protocol.startsWith("http")) {
       elBaseUrl.value = window.location.href.replace(/qr\.html.*$/, "");
     } else {
-      elBaseUrl.value = "https://tu-usuario.github.io/QR-Marcacion/";
+      elBaseUrl.value = "https://delipsium.github.io/QR-Marcacion/";
     }
 
     function buildTargetUrl() {
@@ -195,7 +195,7 @@
         }
         return url.toString();
       } catch (_) {
-        return movil ? `${base}?movil=${encodeURIComponent(movil)}` : base;
+        return movil ? `${base}${base.includes("?") ? "&" : "?"}movil=${encodeURIComponent(movil)}` : base;
       }
     }
 
@@ -213,17 +213,18 @@
       }
 
       elQrContainer.innerHTML = "";
-      if (!targetUrl) return;
-
-      if (typeof QRCode === "undefined") {
-        elQrContainer.innerHTML = "<p style='color:#ef4444;font-size:0.85rem;'>Conéctate a internet para generar la imagen del QR.</p>";
+      if (!targetUrl) {
+        elQrContainer.innerHTML = "<p style='color:#64748b;font-size:0.85rem;'>Ingresa una URL para generar el QR.</p>";
         return;
       }
 
-      const canvas = document.createElement("canvas");
-      QRCode.toCanvas(canvas, targetUrl, { width: 240, margin: 1 }, (err) => {
-        if (!err) elQrContainer.appendChild(canvas);
-      });
+      try {
+        const canvas = document.createElement("canvas");
+        window.LocalQRCode.drawToCanvas(canvas, targetUrl, { width: 512, margin: 4 });
+        elQrContainer.appendChild(canvas);
+      } catch (err) {
+        elQrContainer.innerHTML = `<p style='color:#ef4444;font-size:0.85rem;'>Error al generar el QR: ${err.message}</p>`;
+      }
     }
 
     elBaseUrl.addEventListener("input", renderQR);
@@ -232,12 +233,42 @@
 
     elDownloadBtn.addEventListener("click", () => {
       const canvas = elQrContainer.querySelector("canvas");
-      if (!canvas) return;
-      const link = document.createElement("a");
-      const movil = (elMovilId.value || "general").trim().toLowerCase().replace(/\s+/g, "-");
-      link.download = `qr-marcacion-${movil}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      if (!canvas) {
+        alert("Primero genera un código QR válido.");
+        return;
+      }
+      const movil = (elMovilId.value || "general")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const filename = `qr-marcacion-${movil || "general"}.png`;
+
+      const triggerDownload = (href, revokeAfter) => {
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = href;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        if (revokeAfter) {
+          setTimeout(() => URL.revokeObjectURL(href), 1000);
+        }
+      };
+
+      if (canvas.toBlob) {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            triggerDownload(URL.createObjectURL(blob), true);
+          } else {
+            triggerDownload(canvas.toDataURL("image/png"), false);
+          }
+        }, "image/png");
+      } else {
+        triggerDownload(canvas.toDataURL("image/png"), false);
+      }
     });
 
     elPrintBtn.addEventListener("click", () => window.print());
