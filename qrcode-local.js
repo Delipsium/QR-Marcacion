@@ -310,14 +310,16 @@
     }
     const bits = ((data << 10) | rem) ^ 0x5412;
 
-    for (let i = 0; i <= 5; i++) modules[8][i] = (bits >>> i) & 1;
-    modules[8][7] = (bits >>> 6) & 1;
+    // Primera copia (alrededor del detector superior izquierdo)
+    for (let i = 0; i <= 5; i++) modules[i][8] = (bits >>> i) & 1;
+    modules[7][8] = (bits >>> 6) & 1;
     modules[8][8] = (bits >>> 7) & 1;
-    modules[7][8] = (bits >>> 8) & 1;
-    for (let i = 9; i < 15; i++) modules[14 - i][8] = (bits >>> i) & 1;
+    modules[8][7] = (bits >>> 8) & 1;
+    for (let i = 9; i < 15; i++) modules[8][14 - i] = (bits >>> i) & 1;
 
-    for (let i = 0; i < 7; i++) modules[size - 1 - i][8] = (bits >>> i) & 1;
-    for (let i = 7; i < 15; i++) modules[8][size - 15 + i] = (bits >>> i) & 1;
+    // Segunda copia (superior derecho e inferior izquierdo)
+    for (let i = 0; i < 8; i++) modules[8][size - 1 - i] = (bits >>> i) & 1;
+    for (let i = 8; i < 15; i++) modules[size - 15 + i][8] = (bits >>> i) & 1;
   }
 
   function computePenalty(modules, size) {
