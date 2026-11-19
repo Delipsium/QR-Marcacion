@@ -10,7 +10,7 @@ window.APP_CONFIG = {
 
   // URL del Webhook de Power Automate (Flujo: "Cuando se recibe una solicitud HTTP")
   // Déjalo vacío ("") para probar en Modo Demo (guarda localmente sin enviar a SharePoint).
-  webhookUrl: "https://default0bf7cceb15b448ea8f8986a951d2b7.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/b63044e2eeb64fcd92feaef710d53939/triggers/manual/paths/invoke?api-version=1",
+  webhookUrl: "https://default0bf7cceb15b448ea8f8986a951d2b7.e9.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/b63044e2eeb64fcd92feaef710d53939/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=t3fJjCbKjkWOTvftBimPyGENQt_oVCg5tedzQ5KS0Pg",
 
   // Clave secreta opcional para validar que las peticiones vienen de tu formulario.
   // Si la configuras aquí, agrégala también como condición en Power Automate.
