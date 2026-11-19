@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Registro de Traslados QR</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div class="header-top">
+        <span id="status-badge" class="status-badge status-online">
+          <span class="dot"></span>
+          <span id="status-text">En línea</span>
+        </span>
+        <span id="movil-badge" class="movil-badge" hidden>Móvil: <strong id="movil-name"></strong></span>
+      </div>
+      <h1 id="app-title">Registro de Traslados</h1>
+      <p id="app-subtitle" class="subtitle">Control individual de inicio y fin de viaje</p>
+    </header>
+
+    <section class="clock-card" aria-label="Fecha y hora automática">
+      <div class="clock-item">
+        <span class="clock-label">Fecha</span>
+        <span id="live-date" class="clock-value">--/--/----</span>
+      </div>
+      <div class="clock-divider"></div>
+      <div class="clock-item">
+        <span class="clock-label">Hora automática</span>
+        <span id="live-time" class="clock-value">--:--:--</span>
+      </div>
+    </section>
+
+    <div id="sync-banner" class="sync-banner" hidden>
+      <span id="sync-banner-text"></span>
+      <button type="button" id="retry-sync-btn" class="btn-link">Reintentar</button>
+    </div>
+
+    <div id="demo-banner" class="demo-banner" hidden>
+      Modo Demo activo (sin SharePoint conectado aún). Los registros se guardan localmente para pruebas.
+    </div>
+
+    <form id="marcacion-form" class="card" novalidate>
+      <div class="field">
+        <div class="field-header">
+          <label for="rut">RUT del pasajero</label>
+          <button type="button" id="clear-saved-btn" class="btn-link" hidden>Cambiar pasajero</button>
+        </div>
+        <input
+          type="text"
+          id="rut"
+          name="rut"
+          inputmode="text"
+          autocomplete="off"
+          placeholder="Ej: 12.345.678-9"
+          maxlength="12"
+          required
+        />
+        <small id="rut-error" class="error-text" hidden></small>
+      </div>
+
+      <div class="field">
+        <label for="centro-costos">Centro de costos</label>
+        <input
+          type="text"
+          id="centro-costos"
+          name="centroCostos"
+          list="cost-centers-list"
+          autocomplete="off"
+          placeholder="Ej: CC-101 o nombre del área"
+          maxlength="60"
+          required
+        />
+        <datalist id="cost-centers-list"></datalist>
+        <small id="cc-error" class="error-text" hidden></small>
+      </div>
+
+      <div class="field">
+        <label>Tipo de marcación</label>
+        <div class="type-grid" role="radiogroup" aria-label="Tipo de marcación">
+          <button type="button" class="type-btn" data-type="Inicio" aria-pressed="false">
+            <span class="type-icon">▶</span>
+            <span class="type-title">Inicio</span>
+            <span class="type-desc">Subida al móvil</span>
+          </button>
+          <button type="button" class="type-btn" data-type="Finalización" aria-pressed="false">
+            <span class="type-icon">■</span>
+            <span class="type-title">Finalización</span>
+            <span class="type-desc">Bajada del móvil</span>
+          </button>
+        </div>
+        <input type="hidden" id="tipo" name="tipo" required />
+        <small id="tipo-error" class="error-text" hidden></small>
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn-primary">
+        Registrar Marcación
+      </button>
+    </form>
+
+    <section id="receipt-card" class="card receipt-card" hidden>
+      <div class="receipt-icon" id="receipt-icon">✓</div>
+      <h2 id="receipt-title">Marcación registrada</h2>
+      <p id="receipt-subtitle" class="receipt-subtitle"></p>
+      <dl class="receipt-details">
+        <div>
+          <dt>RUT</dt>
+          <dd id="rec-rut"></dd>
+        </div>
+        <div>
+          <dt>Centro de costos</dt>
+          <dd id="rec-cc"></dd>
+        </div>
+        <div>
+          <dt>Tipo</dt>
+          <dd id="rec-tipo"></dd>
+        </div>
+        <div>
+          <dt>Fecha y hora</dt>
+          <dd id="rec-datetime"></dd>
+        </div>
+        <div>
+          <dt>Móvil</dt>
+          <dd id="rec-movil"></dd>
+        </div>
+      </dl>
+      <button type="button" id="new-record-btn" class="btn-secondary">
+        Realizar otra marcación
+      </button>
+    </section>
+
+    <footer class="app-footer">
+      <span>Registro automático 24/7</span>
+      <span id="pending-count-footer"></span>
+    </footer>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

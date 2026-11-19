@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de QR Imprimible - Registro de Traslados</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+    .layout {
+      width: 100%;
+      max-width: 820px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    h1 { font-size: 1.3rem; }
+    p { font-size: 0.9rem; color: var(--muted); line-height: 1.45; }
+    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 0.95rem;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 700;
+      font-size: 0.92rem;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: #334155; color: #fff; }
+
+    /* Tarjeta imprimible */
+    .print-card {
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      border: 2px dashed #cbd5e1;
+    }
+    .print-card h2 { font-size: 1.35rem; font-weight: 800; }
+    .print-card .movil-tag {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    #qr-container {
+      padding: 12px;
+      background: #ffffff;
+      border-radius: 12px;
+    }
+    #qr-container canvas,
+    #qr-container img {
+      display: block;
+      max-width: 240px;
+      height: auto;
+    }
+    .print-steps {
+      font-size: 0.85rem;
+      color: #334155;
+      line-height: 1.5;
+    }
+    .url-preview {
+      font-size: 0.72rem;
+      color: #64748b;
+      word-break: break-all;
+    }
+
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .no-print { display: none !important; }
+      .layout { display: block; max-width: 420px; margin: 24px auto; }
+      .print-card { border: 2px solid #0f172a; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="panel no-print">
+      <h1>Generador de QR Imprimible</h1>
+      <p>
+        Crea el código QR una sola vez, imprímelo y pégalo en el móvil. Al escanearlo, cada pasajero abrirá el formulario con la fecha y hora automática.
+      </p>
+
+      <div>
+        <label for="base-url">URL donde publicaste el formulario</label>
+        <input id="base-url" type="url" placeholder="https://tu-usuario.github.io/QR-Marcacion/" />
+      </div>
+
+      <div>
+        <label for="movil-id">Nombre o Patente del Móvil (opcional)</label>
+        <input id="movil-id" type="text" placeholder="Ej: Móvil 01 (o dejar vacío para QR general)" />
+      </div>
+
+      <div>
+        <label for="card-title">Título en el cartel imprimible</label>
+        <input id="card-title" type="text" value="Registro de Viaje" />
+      </div>
+
+      <div class="actions">
+        <button type="button" id="download-btn" class="btn-primary">Descargar PNG</button>
+        <button type="button" id="print-btn" class="btn-secondary">Imprimir Cartel</button>
+      </div>
+    </section>
+
+    <section class="print-card" aria-label="Vista previa para imprimir">
+      <h2 id="preview-title">Registro de Viaje</h2>
+      <span id="preview-movil" class="movil-tag" hidden></span>
+      <div id="qr-container"></div>
+      <p class="print-steps">
+        <strong>1.</strong> Escanea este QR con la cámara de tu celular.<br />
+        <strong>2.</strong> Ingresa tu <strong>RUT</strong> y <strong>Centro de Costos</strong>.<br />
+        <strong>3.</strong> Marca <strong>Inicio</strong> al subir y <strong>Finalización</strong> al bajar.
+      </p>
+      <span id="preview-url" class="url-preview"></span>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+    const elBaseUrl = document.getElementById("base-url");
+    const elMovilId = document.getElementById("movil-id");
+    const elCardTitle = document.getElementById("card-title");
+    const elPreviewTitle = document.getElementById("preview-title");
+    const elPreviewMovil = document.getElementById("preview-movil");
+    const elPreviewUrl = document.getElementById("preview-url");
+    const elQrContainer = document.getElementById("qr-container");
+    const elDownloadBtn = document.getElementById("download-btn");
+    const elPrintBtn = document.getElementById("print-btn");
+
+    // Sugerir URL actual si no es file://
+    if (window.location.protocol.startsWith("http")) {
+      elBaseUrl.value = window.location.href.replace(/qr\.html.*$/, "");
+    } else {
+      elBaseUrl.value = "https://tu-usuario.github.io/QR-Marcacion/";
+    }
+
+    function buildTargetUrl() {
+      const base = (elBaseUrl.value || "").trim();
+      const movil = (elMovilId.value || "").trim();
+      if (!base) return "";
+      try {
+        const url = new URL(base);
+        if (movil) {
+          url.searchParams.set("movil", movil);
+        }
+        return url.toString();
+      } catch (_) {
+        return movil ? `${base}?movil=${encodeURIComponent(movil)}` : base;
+      }
+    }
+
+    function renderQR() {
+      const targetUrl = buildTargetUrl();
+      const movil = (elMovilId.value || "").trim();
+      elPreviewTitle.textContent = (elCardTitle.value || "Registro de Viaje").trim();
+      elPreviewUrl.textContent = targetUrl;
+
+      if (movil) {
+        elPreviewMovil.textContent = movil;
+        elPreviewMovil.hidden = false;
+      } else {
+        elPreviewMovil.hidden = true;
+      }
+
+      elQrContainer.innerHTML = "";
+      if (!targetUrl) return;
+
+      if (typeof QRCode === "undefined") {
+        elQrContainer.innerHTML = "<p style='color:#ef4444;font-size:0.85rem;'>Conéctate a internet para generar la imagen del QR.</p>";
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      QRCode.toCanvas(canvas, targetUrl, { width: 240, margin: 1 }, (err) => {
+        if (!err) elQrContainer.appendChild(canvas);
+      });
+    }
+
+    elBaseUrl.addEventListener("input", renderQR);
+    elMovilId.addEventListener("input", renderQR);
+    elCardTitle.addEventListener("input", renderQR);
+
+    elDownloadBtn.addEventListener("click", () => {
+      const canvas = elQrContainer.querySelector("canvas");
+      if (!canvas) return;
+      const link = document.createElement("a");
+      const movil = (elMovilId.value || "general").trim().toLowerCase().replace(/\s+/g, "-");
+      link.download = `qr-marcacion-${movil}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+
+    elPrintBtn.addEventListener("click", () => window.print());
+
+    renderQR();
+  </script>
+</body>
+</html>
