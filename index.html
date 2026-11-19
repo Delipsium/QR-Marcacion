@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <title>Registro de Traslados QR</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <main class="app-shell">
@@ -70,7 +70,7 @@
           name="rut"
           inputmode="text"
           autocomplete="off"
-          placeholder="Ej: 12.345.678-9"
+          placeholder="Ej: 123456789 (sin puntos ni guión)"
           maxlength="12"
           required
         />
@@ -95,13 +95,16 @@
 
       <div class="field">
         <label>Tipo de marcación</label>
-        <div class="type-grid" role="radiogroup" aria-label="Tipo de marcación">
-          <button type="button" class="type-btn" data-type="Inicio" aria-pressed="false">
+        <div id="trip-status-hint" class="trip-hint">
+          Ingresa tu RUT válido para habilitar Inicio o Finalización.
+        </div>
+        <div id="type-grid" class="type-grid" role="radiogroup" aria-label="Tipo de marcación">
+          <button type="button" id="btn-inicio" class="type-btn" data-type="Inicio" aria-pressed="false" disabled>
             <span class="type-icon">▶</span>
             <span class="type-title">Inicio</span>
             <span class="type-desc">Subida al móvil</span>
           </button>
-          <button type="button" class="type-btn" data-type="Finalización" aria-pressed="false">
+          <button type="button" id="btn-fin" class="type-btn" data-type="Finalización" aria-pressed="false" disabled>
             <span class="type-icon">■</span>
             <span class="type-title">Finalización</span>
             <span class="type-desc">Bajada del móvil</span>
@@ -149,7 +152,7 @@
     </footer>
   </main>
 
-  <script src="config.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="config.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

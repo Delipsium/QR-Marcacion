@@ -3,6 +3,10 @@
   const QUEUE_KEY = "qr_marcacion_queue_v1";
   const DEMO_LOGS_KEY = "qr_marcacion_demo_logs_v1";
   const LAST_PASSENGER_KEY = "qr_marcacion_last_passenger_v1";
+  const ACTIVE_TRIPS_KEY = "qr_marcacion_active_trips_v1";
+
+  const maxTripHours = Number(CFG.maxTripHours) > 0 ? Number(CFG.maxTripHours) : 5;
+  const maxTripMs = maxTripHours * 3600 * 1000;
 
   // Elementos del DOM
   const elTitle = document.getElementById("app-title");
@@ -30,6 +34,10 @@
   const elCC = document.getElementById("centro-costos");
   const elCCList = document.getElementById("cost-centers-list");
   const elCCError = document.getElementById("cc-error");
+  const elTripHint = document.getElementById("trip-status-hint");
+  const elTypeGrid = document.getElementById("type-grid");
+  const elBtnInicio = document.getElementById("btn-inicio");
+  const elBtnFin = document.getElementById("btn-fin");
   const elTipoInput = document.getElementById("tipo");
   const elTipoError = document.getElementById("tipo-error");
   const elTypeButtons = document.querySelectorAll(".type-btn");
@@ -93,6 +101,7 @@
 
     populateCostCenters();
     restoreLastPassenger();
+    syncTripUIForRut();
     updateClock();
     setInterval(updateClock, 1000);
 
@@ -127,7 +136,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(LAST_PASSENGER_KEY) || "null");
       if (saved && saved.rut) {
-        elRut.value = saved.rut;
+        elRut.value = cleanRut(saved.rut);
         if (saved.centroCostos) elCC.value = saved.centroCostos;
         elClearSavedBtn.hidden = false;
       }
@@ -152,16 +161,10 @@
     const minutes = pad(date.getMinutes());
     const seconds = pad(date.getSeconds());
 
-    const offsetMin = -date.getTimezoneOffset();
-    const sign = offsetMin >= 0 ? "+" : "-";
-    const absMin = Math.abs(offsetMin);
-    const offsetStr = `${sign}${pad(Math.floor(absMin / 60))}:${pad(absMin % 60)}`;
-
     return {
       fechaISO: `${year}-${month}-${day}`,
       fechaDisplay: `${day}/${month}/${year}`,
-      hora: `${hours}:${minutes}:${seconds}`,
-      timestampISO: `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetStr}`
+      hora: `${hours}:${minutes}:${seconds}`
     };
   }
 
@@ -171,18 +174,9 @@
     elLiveTime.textContent = now.hora;
   }
 
-  // --- Validación y formato de RUT chileno ---
+  // --- Normalización y validación de RUT chileno (sin puntos ni guión) ---
   function cleanRut(value) {
-    return value.replace(/[^0-9kK]/g, "").toUpperCase();
-  }
-
-  function formatRut(value) {
-    const clean = cleanRut(value);
-    if (clean.length <= 1) return clean;
-    const body = clean.slice(0, -1);
-    const dv = clean.slice(-1);
-    const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return `${formattedBody}-${dv}`;
+    return String(value || "").replace(/[^0-9kK]/g, "").toUpperCase();
   }
 
   function isValidRut(value) {
@@ -202,6 +196,105 @@
     const remainder = 11 - (sum % 11);
     const expectedDv = remainder === 11 ? "0" : remainder === 10 ? "K" : String(remainder);
     return dv === expectedDv;
+  }
+
+  // --- Control de viaje activo por RUT (evita marcar Inicio/Fin invertidos) ---
+  function getActiveTripsMap() {
+    try {
+      return JSON.parse(localStorage.getItem(ACTIVE_TRIPS_KEY) || "{}");
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveActiveTripsMap(map) {
+    localStorage.setItem(ACTIVE_TRIPS_KEY, JSON.stringify(map));
+  }
+
+  function getActiveTrip(rut) {
+    const map = getActiveTripsMap();
+    const trip = map[rut];
+    if (!trip) return { trip: null, expired: false };
+
+    const elapsed = Date.now() - Number(trip.startedAtMs || 0);
+    if (!trip.startedAtMs || elapsed > maxTripMs) {
+      delete map[rut];
+      saveActiveTripsMap(map);
+      return { trip: null, expired: true };
+    }
+    return { trip, expired: false };
+  }
+
+  function setActiveTrip(rut, tripData) {
+    const map = getActiveTripsMap();
+    map[rut] = tripData;
+    saveActiveTripsMap(map);
+  }
+
+  function clearActiveTrip(rut) {
+    const map = getActiveTripsMap();
+    if (map[rut]) {
+      delete map[rut];
+      saveActiveTripsMap(map);
+    }
+  }
+
+  function syncTripUIForRut() {
+    const rut = cleanRut(elRut.value);
+    elTipoError.hidden = true;
+
+    if (!isValidRut(rut)) {
+      elTypeGrid.classList.remove("single-option");
+      elBtnInicio.hidden = false;
+      elBtnFin.hidden = false;
+      elBtnInicio.disabled = true;
+      elBtnFin.disabled = true;
+      elBtnInicio.setAttribute("aria-pressed", "false");
+      elBtnFin.setAttribute("aria-pressed", "false");
+      elTipoInput.value = "";
+      elTripHint.className = "trip-hint";
+      elTripHint.textContent = "Ingresa tu RUT válido para habilitar Inicio o Finalización.";
+      elSubmitBtn.disabled = true;
+      return;
+    }
+
+    const { trip, expired } = getActiveTrip(rut);
+    elTypeGrid.classList.add("single-option");
+    elSubmitBtn.disabled = false;
+
+    if (trip) {
+      elBtnInicio.hidden = true;
+      elBtnInicio.disabled = true;
+      elBtnInicio.setAttribute("aria-pressed", "false");
+
+      elBtnFin.hidden = false;
+      elBtnFin.disabled = false;
+      elBtnFin.setAttribute("aria-pressed", "true");
+      elTipoInput.value = "Finalización";
+
+      if (!elCC.value.trim() && trip.centroCostos) {
+        elCC.value = trip.centroCostos;
+      }
+
+      elTripHint.className = "trip-hint trip-active";
+      elTripHint.textContent =
+        `Viaje en curso desde las ${trip.horaInicio} (${trip.fechaDisplay}). ` +
+        `Solo está habilitada la Finalización (límite ${maxTripHours} h).`;
+    } else {
+      elBtnFin.hidden = true;
+      elBtnFin.disabled = true;
+      elBtnFin.setAttribute("aria-pressed", "false");
+
+      elBtnInicio.hidden = false;
+      elBtnInicio.disabled = false;
+      elBtnInicio.setAttribute("aria-pressed", "true");
+      elTipoInput.value = "Inicio";
+
+      elTripHint.className = "trip-hint trip-ready";
+      elTripHint.textContent = expired
+        ? `Tu inicio anterior superó las ${maxTripHours} h sin cierre y expiró. Puedes registrar un nuevo Inicio.`
+        : "Sin viaje en curso. Marca Inicio al subir al móvil.";
+    }
   }
 
   // --- Cola offline ---
@@ -329,8 +422,9 @@
     });
 
     elRut.addEventListener("input", () => {
-      elRut.value = formatRut(elRut.value);
+      elRut.value = cleanRut(elRut.value);
       clearError(elRut, elRutError);
+      syncTripUIForRut();
     });
 
     elCC.addEventListener("input", () => {
@@ -342,11 +436,13 @@
       elRut.value = "";
       elCC.value = "";
       elClearSavedBtn.hidden = true;
+      syncTripUIForRut();
       elRut.focus();
     });
 
     elTypeButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
+        if (btn.disabled || btn.hidden) return;
         const selectedType = btn.dataset.type;
         elTipoInput.value = selectedType;
         elTypeButtons.forEach((b) => {
@@ -361,8 +457,7 @@
     elNewRecordBtn.addEventListener("click", () => {
       elReceipt.hidden = true;
       elForm.hidden = false;
-      elTipoInput.value = "";
-      elTypeButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+      syncTripUIForRut();
     });
   }
 
@@ -377,17 +472,24 @@
     errorEl.hidden = true;
   }
 
+  function createTripId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
 
-    const rutFormatted = formatRut(elRut.value);
+    const rutNormalized = cleanRut(elRut.value);
+    elRut.value = rutNormalized;
     const centroCostos = elCC.value.trim();
-    const tipo = elTipoInput.value.trim();
 
     let valid = true;
 
-    if (!isValidRut(rutFormatted)) {
-      showError(elRut, elRutError, "Ingresa un RUT válido (ej: 12.345.678-9).");
+    if (!isValidRut(rutNormalized)) {
+      showError(elRut, elRutError, "Ingresa un RUT válido sin puntos ni guión (ej: 123456789).");
       valid = false;
     }
 
@@ -404,33 +506,45 @@
       valid = false;
     }
 
-    if (tipo !== "Inicio" && tipo !== "Finalización") {
-      showError(null, elTipoError, "Selecciona si es Inicio o Finalización del viaje.");
-      valid = false;
-    }
-
     if (!valid) return;
+
+    // Revalidar estado del viaje en el instante del envío para evitar inconsistencias
+    const { trip } = getActiveTrip(rutNormalized);
+    const tipo = trip ? "Finalización" : "Inicio";
 
     elSubmitBtn.disabled = true;
     elSubmitBtn.textContent = "Registrando...";
 
     const ts = getTimestampParts();
+    const tripId = trip ? trip.tripId : createTripId();
+
     const record = {
-      id: typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      rut: rutFormatted,
+      id: tripId,
+      rut: rutNormalized,
       centroCostos,
       tipo,
-      fecha: ts.fechaISO,
+      estado: tipo === "Inicio" ? "En viaje" : "Finalizado",
+      fecha: trip ? trip.fechaInicio : ts.fechaISO,
       hora: ts.hora,
-      horaInicio: tipo === "Inicio" ? ts.hora : "",
+      horaInicio: trip ? trip.horaInicio : ts.hora,
       horaFin: tipo === "Finalización" ? ts.hora : "",
-      timestampISO: ts.timestampISO,
       sincronizadoDesde: "En línea"
     };
 
-    saveLastPassenger(rutFormatted, centroCostos);
+    if (tipo === "Inicio") {
+      setActiveTrip(rutNormalized, {
+        tripId,
+        fechaInicio: ts.fechaISO,
+        fechaDisplay: ts.fechaDisplay,
+        horaInicio: ts.hora,
+        startedAtMs: Date.now(),
+        centroCostos
+      });
+    } else {
+      clearActiveTrip(rutNormalized);
+    }
+
+    saveLastPassenger(rutNormalized, centroCostos);
 
     let queuedOffline = false;
 

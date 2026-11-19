@@ -266,10 +266,44 @@ input[type="text"].invalid {
   font-weight: 500;
 }
 
+.trip-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.trip-hint.trip-active {
+  background: var(--end-bg);
+  border-color: var(--warning-border);
+  color: var(--end-text);
+}
+
+.trip-hint.trip-ready {
+  background: var(--start-bg);
+  border-color: #a7f3d0;
+  color: var(--start-text);
+}
+
 .type-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.type-grid.single-option {
+  grid-template-columns: 1fr;
+}
+
+.type-btn[hidden] {
+  display: none;
+}
+
+.type-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .type-btn {

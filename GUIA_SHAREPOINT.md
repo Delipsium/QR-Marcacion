@@ -1,6 +1,6 @@
 # Guía de Conexión con SharePoint y Excel Privado
 
-Esta guía explica cómo conectar el formulario QR con un archivo Excel en **SharePoint** al que **solo tenga acceso el jefe (y tú)**, sin que los pasajeros puedan ver los registros ni necesiten iniciar sesión en Microsoft.
+Esta guía explica cómo conectar el formulario QR con un archivo Excel en **SharePoint** al que **solo tenga acceso el jefe (y tú)**, dejando **Inicio y Finalización en la misma fila** por cada viaje.
 
 ---
 
@@ -12,48 +12,46 @@ Esta guía explica cómo conectar el formulario QR con un archivo Excel en **Sha
 
 | A | B | C | D | E | F | G | H | I | J |
 |---|---|---|---|---|---|---|---|---|---|
-| `ID` | `Fecha` | `Hora` | `HoraInicio` | `HoraFin` | `RUT` | `CentroCostos` | `Tipo` | `TimestampISO` | `SincronizadoDesde` |
+| `ID` | `Fecha` | `Hora` | `HoraInicio` | `HoraFin` | `RUT` | `CentroCostos` | `Tipo` | `Estado` | `SincronizadoDesde` |
 
 4. Selecciona el rango `A1:J2`, ve a **Insertar > Tabla**, marca **"La tabla tiene encabezados"** y nómbrala `Registros_Viajes` (en *Diseño de tabla > Nombre de tabla*).
 
-> Con `HoraInicio` y `HoraFin`, cada marcación ya deja la hora en su columna correspondiente sin depender de fórmulas complejas.
+> **¿Cómo queda cada viaje en una sola fila?**  
+> El formulario genera un `ID` único cuando el pasajero marca **Inicio** y reutiliza ese **mismo `ID`** cuando marca **Finalización**. Así Power Automate crea la fila en el Inicio y actualiza esa misma fila en la Finalización.
 
 ---
 
-## 2. Configurar Power Automate (¡Muy importante el mapeo!)
+## 2. Configurar Power Automate (Inicio + Fin en la misma fila)
 
-> **Error común a evitar:** Si en el bloque de Excel escribes texto plano como `rut`, `fecha`, `hora`, Excel guardará literalmente las palabras `"rut"`, `"fecha"`, `"hora"`. Debes insertar los campos desde **Contenido dinámico** (ícono de rayo ⚡) o desde la pestaña **Expresión** (`fx`).
+> **Importante:** En los campos de Excel dentro de Power Automate nunca escribas texto fijo (`rut`, `fecha`, etc.). Inserta los valores desde **Contenido dinámico** (⚡) o pegando las expresiones en la pestaña **Expresión (`fx`)**.
 
 1. Entra a [make.powerautomate.com](https://make.powerautomate.com) con la cuenta que tiene permiso sobre el SharePoint.
-2. Abre o crea tu flujo con el desencadenador **"Cuando se recibe una solicitud HTTP"** (*When an HTTP request is received*) configurado en **"Cualquier usuario"** (*Anyone*).
-3. En **Esquema JSON del cuerpo de la solicitud**, pega exactamente esto:
+2. En el desencadenador **"Cuando se recibe una solicitud HTTP"** (*When an HTTP request is received*, configurado en **"Cualquier usuario"**), pega este **Esquema JSON**:
 
 ```json
 {
   "type": "object",
   "properties": {
     "id": { "type": "string" },
+    "rut": { "type": "string" },
+    "centroCostos": { "type": "string" },
+    "tipo": { "type": "string" },
+    "estado": { "type": "string" },
     "fecha": { "type": "string" },
     "hora": { "type": "string" },
     "horaInicio": { "type": "string" },
     "horaFin": { "type": "string" },
-    "rut": { "type": "string" },
-    "centroCostos": { "type": "string" },
-    "tipo": { "type": "string" },
-    "timestampISO": { "type": "string" },
     "sincronizadoDesde": { "type": "string" },
     "apiKey": { "type": "string" }
   }
 }
 ```
 
-4. *(Opcional recomendado)* Agrega una **Condición** para validar `apiKey` si la configuraste en `config.js`.
-5. Agrega la acción **Excel Online (Business) > Agregar una fila a una tabla** (*Add a row into a table*):
-   - **Ubicación**: Tu sitio de SharePoint
-   - **Biblioteca de documentos**: `Documentos` (o la que uses)
-   - **Archivo**: `/Control_Traslados.xlsx`
-   - **Tabla**: `Registros_Viajes`
-   - Para cada columna de la tabla, haz clic en el campo, abre **Contenido dinámico** (⚡) y elige el campo correspondiente; **o si no aparecen**, abre la pestaña **Expresión (`fx`)** y pega exactamente:
+3. *(Opcional recomendado)* Agrega una **Condición** para validar `apiKey` si la configuraste en `config.js`.
+4. Agrega una **Condición**: `triggerBody()?['tipo']` **es igual a** `Inicio`.
+
+### Rama "Sí" (cuando `tipo` es `Inicio`)
+Agrega **Excel Online (Business) > Agregar una fila a una tabla** (*Add a row into a table*) en `Registros_Viajes` con estas expresiones (`fx`):
 
 | Columna en Excel | Expresión en Power Automate (`fx`) |
 |---|---|
@@ -65,36 +63,36 @@ Esta guía explica cómo conectar el formulario QR con un archivo Excel en **Sha
 | `RUT` | `triggerBody()?['rut']` |
 | `CentroCostos` | `triggerBody()?['centroCostos']` |
 | `Tipo` | `triggerBody()?['tipo']` |
-| `TimestampISO` | `triggerBody()?['timestampISO']` |
+| `Estado` | `triggerBody()?['estado']` |
 | `SincronizadoDesde` | `triggerBody()?['sincronizadoDesde']` |
 
-6. Agrega al final la acción **Respuesta** (*Response*) con Código de estado `200` y cuerpo `{"ok": true}`.
-7. **Guarda y activa** el flujo, copia la **URL HTTP POST** completa (con `&sp=...&sv=...&sig=...`) y pégala en `webhookUrl` dentro de [config.js](file:///c:/Users/mreynosor/Desktop/QR/QR-Marcacion/config.js).
+### Rama "No" (cuando `tipo` es `Finalización`)
+Agrega **Excel Online (Business) > Actualizar una fila** (*Update a row*) en la misma tabla `Registros_Viajes`:
+- **Columna clave** (*Key Column*): `ID`
+- **Valor de clave** (*Key Value*): `triggerBody()?['id']`
+- Campos a actualizar (`fx`):
+
+| Columna en Excel | Expresión en Power Automate (`fx`) |
+|---|---|
+| `Hora` | `triggerBody()?['hora']` |
+| `HoraFin` | `triggerBody()?['horaFin']` |
+| `Tipo` | `triggerBody()?['tipo']` |
+| `Estado` | `triggerBody()?['estado']` |
+| `SincronizadoDesde` | `triggerBody()?['sincronizadoDesde']` |
+
+*(Opcional de respaldo: justo debajo de "Actualizar una fila", puedes agregar un "Agregar una fila a una tabla" y en sus 3 puntos > **Configurar ejecución posterior** marcar **solo "Ha dado error"** por si alguien borró manualmente la fila de Inicio en Excel).*
+
+5. Agrega al final (después de la condición) la acción **Respuesta** (*Response*) con Código de estado `200` y cuerpo `{"ok": true}`.
+6. **Guarda y activa** el flujo.
 
 ---
 
-## 3. Cómo hacer la hoja `Resumen` sin errores de fórmula
+## 3. Reglas automáticas del formulario (Offline y límite de tiempo)
 
-Si usaste `=MIN.SI.CONJUNTO(...)` / `=MAX.SI.CONJUNTO(...)` y Excel mostró un error (`#¿NOMBRE?`, `#¡VALOR!`, `00:00` o error de sintaxis), ocurre por tres motivos habituales:
-1. El campo `Hora` llega como **texto** (`"16:15:53"`) y `MIN.SI.CONJUNTO` / `MAX.SI.CONJUNTO` ignoran texto o fallan si no es número.
-2. En **SharePoint / Excel Online**, la configuración regional puede exigir coma `,` en lugar de punto y coma `;`, o nombres en inglés (`MINIFS` / `MAXIFS`).
-3. Si usas `HoraInicio` y `HoraFin` ya separados, **no necesitas `MIN.SI.CONJUNTO`**.
-
-### Opción A (Más confiable): Tabla Dinámica en Excel
-1. Haz clic dentro de la tabla `Registros_Viajes` y ve a **Insertar > Tabla dinámica**.
-2. Configúrala así:
-   - **Filas**: `Fecha`, `RUT`, `CentroCostos`
-   - **Columnas**: `Tipo`
-   - **Valores**: `Hora` (o usar `HoraInicio` y `HoraFin` directamente en filas/valores con `Mín`/`Máx` si los guardas como hora numérica, o simplemente listar `Fecha`, `RUT`, `CentroCostos`, `HoraInicio`, `HoraFin`).
-
-### Opción B: Fórmula de texto compatible (`BUSCARX` / `INDICE + COINCIDIR`)
-Si en tu hoja `Resumen` tienes `Fecha` en `A2` y `RUT` en `B2`, y en `Registros_Viajes` guardaste `HoraInicio` y `HoraFin`:
-- **Hora Inicio** (Excel en español con `;`, si tu Excel usa `,` cambia `;` por `,`):
-  ```excel
-  =SI.ERROR(INDICE(Registros_Viajes[HoraInicio]; COINCIDIR(1; (Registros_Viajes[Fecha]=A2)*(Registros_Viajes[RUT]=B2)*(Registros_Viajes[HoraInicio]<>""); 0)); "")
-  ```
-- **Hora Fin**:
-  ```excel
-  =SI.ERROR(INDICE(Registros_Viajes[HoraFin]; COINCIDIR(1; (Registros_Viajes[Fecha]=A2)*(Registros_Viajes[RUT]=B2)*(Registros_Viajes[HoraFin]<>""); 0)); "")
-  ```
-*(Y si tu Excel Online está en inglés: `IFERROR(INDEX(..., MATCH(1, (...)*(...)*(...), 0)), "")`)*.
+- **RUT normalizado**: se guarda y envía sin puntos ni guión (ej. `123456789` o `12345678K`).
+- **Bloqueo inteligente por estado**:
+  - Si el RUT **no tiene un viaje en curso**, solo aparece habilitado el botón **Inicio** (no puede marcar Finalización por error).
+  - Apenas marca **Inicio**, la próxima vez que ingrese ese RUT solo aparecerá habilitado el botón **Finalización** (no puede marcar dos Inicios seguidos).
+- **Límite de tiempo (`maxTripHours` en [config.js](file:///c:/Users/mreynosor/Desktop/QR/QR-Marcacion/config.js))**:
+  - Por defecto está en **5 horas**. Si un pasajero olvidó marcar **Finalización** y vuelve a viajar pasado ese tiempo, el viaje anterior expira automáticamente y se habilita **Inicio** nuevamente.
+  - Todo funciona incluso **sin conexión** usando el almacenamiento local del dispositivo.

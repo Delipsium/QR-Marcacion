@@ -16,6 +16,10 @@ window.APP_CONFIG = {
   // Si la configuras aquí, agrégala también como condición en Power Automate.
   apiKey: "",
 
+  // Límite máximo en horas para considerar un viaje "en curso" antes de expirar.
+  // Si alguien olvida marcar Finalización, pasado este tiempo podrá marcar un nuevo Inicio.
+  maxTripHours: 5,
+
   // Lista opcional de Centros de Costos sugeridos (autocompletado).
   // Los pasajeros igual podrán escribir otro si `allowCustomCostCenter` es true.
   costCenters: [
