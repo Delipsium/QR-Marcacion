@@ -13,9 +13,15 @@
   const elMovilName = document.getElementById("movil-name");
   const elLiveDate = document.getElementById("live-date");
   const elLiveTime = document.getElementById("live-time");
+
   const elSyncBanner = document.getElementById("sync-banner");
   const elSyncBannerText = document.getElementById("sync-banner-text");
+  const elSyncBannerDetail = document.getElementById("sync-banner-detail");
   const elRetrySyncBtn = document.getElementById("retry-sync-btn");
+  const elClearQueueBtn = document.getElementById("clear-queue-btn");
+
+  const elConfigBanner = document.getElementById("config-banner");
+  const elConfigBannerDetail = document.getElementById("config-banner-detail");
   const elDemoBanner = document.getElementById("demo-banner");
   const elPendingFooter = document.getElementById("pending-count-footer");
 
@@ -44,8 +50,38 @@
 
   const params = new URLSearchParams(window.location.search);
   const movilName = (params.get("movil") || CFG.defaultMovil || "General").trim();
+  const webhookUrl = (CFG.webhookUrl || "").trim();
 
   let isFlushing = false;
+  let lastSyncError = "";
+
+  // --- Validación de estado del Webhook ---
+  function analyzeWebhookConfig(url) {
+    if (!url) {
+      return { status: "demo", message: "" };
+    }
+    try {
+      const parsed = new URL(url);
+      const isPowerAutomate =
+        parsed.hostname.includes("powerplatform.com") ||
+        parsed.hostname.includes("logic.azure.com");
+      if (isPowerAutomate && !parsed.searchParams.get("sig")) {
+        return {
+          status: "incomplete",
+          message:
+            "Falta la firma (&sig=...) al final de la URL. En Power Automate selecciona 'Cualquier usuario', guarda el flujo con licencia activa y vuelve a copiar la URL HTTP POST completa."
+        };
+      }
+      return { status: "ready", message: "" };
+    } catch (_) {
+      return {
+        status: "incomplete",
+        message: "La URL configurada en config.js no tiene un formato válido."
+      };
+    }
+  }
+
+  const webhookState = analyzeWebhookConfig(webhookUrl);
 
   // --- Inicialización ---
   function init() {
@@ -57,8 +93,12 @@
       elMovilBadge.hidden = false;
     }
 
-    if (!CFG.webhookUrl) {
-      elDemoBanner.hidden = false;
+    elDemoBanner.hidden = webhookState.status !== "demo";
+    if (webhookState.status === "incomplete") {
+      elConfigBanner.hidden = false;
+      elConfigBannerDetail.textContent = webhookState.message;
+    } else {
+      elConfigBanner.hidden = true;
     }
 
     populateCostCenters();
@@ -76,7 +116,10 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("./sw.js")
+        .then((reg) => reg.update().catch(() => {}))
+        .catch(() => {});
     }
   }
 
@@ -199,9 +242,17 @@
         count === 1
           ? "1 marcación pendiente de envío a SharePoint."
           : `${count} marcaciones pendientes de envío a SharePoint.`;
+      if (lastSyncError) {
+        elSyncBannerDetail.textContent = `Último intento: ${lastSyncError}`;
+        elSyncBannerDetail.hidden = false;
+      } else {
+        elSyncBannerDetail.hidden = true;
+      }
       elPendingFooter.textContent = `Pendientes: ${count}`;
     } else {
+      lastSyncError = "";
       elSyncBanner.hidden = true;
+      elSyncBannerDetail.hidden = true;
       elPendingFooter.textContent = "";
     }
   }
@@ -214,7 +265,7 @@
   }
 
   async function sendToWebhook(record) {
-    if (!CFG.webhookUrl) {
+    if (!webhookUrl) {
       const logs = JSON.parse(localStorage.getItem(DEMO_LOGS_KEY) || "[]");
       logs.push(record);
       localStorage.setItem(DEMO_LOGS_KEY, JSON.stringify(logs));
@@ -231,7 +282,7 @@
       apiKey: CFG.apiKey || undefined
     };
 
-    const response = await fetch(CFG.webhookUrl, {
+    const response = await fetch(webhookUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(payload)
@@ -244,18 +295,20 @@
   }
 
   async function flushQueue() {
-    if (isFlushing || !navigator.onLine || !CFG.webhookUrl) return;
+    if (isFlushing || !navigator.onLine || !webhookUrl) return;
     const queue = getQueue();
     if (queue.length === 0) return;
 
     isFlushing = true;
     const remaining = [];
+    lastSyncError = "";
 
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
       try {
         await sendToWebhook({ ...item, sincronizadoDesde: "Cola Offline" });
-      } catch (_) {
+      } catch (err) {
+        lastSyncError = err && err.message ? err.message : "Error de conexión o CORS";
         remaining.push(...queue.slice(i));
         break;
       }
@@ -276,6 +329,13 @@
 
     elRetrySyncBtn.addEventListener("click", () => {
       flushQueue();
+    });
+
+    elClearQueueBtn.addEventListener("click", () => {
+      if (confirm("¿Descartar los registros pendientes de prueba guardados en este dispositivo?")) {
+        lastSyncError = "";
+        saveQueue([]);
+      }
     });
 
     elRut.addEventListener("input", () => {
@@ -383,14 +443,16 @@
 
     let queuedOffline = false;
 
-    if (!navigator.onLine && CFG.webhookUrl) {
+    if (!navigator.onLine && webhookUrl) {
+      lastSyncError = "Sin conexión a internet";
       enqueueRecord(record);
       queuedOffline = true;
     } else {
       try {
         await sendToWebhook(record);
         flushQueue();
-      } catch (_) {
+      } catch (err) {
+        lastSyncError = err && err.message ? err.message : "Error de conexión o CORS";
         enqueueRecord(record);
         queuedOffline = true;
       }
@@ -415,10 +477,10 @@
     if (queuedOffline) {
       elReceiptIcon.textContent = "⏳";
       elReceiptIcon.classList.add("queued");
-      elReceiptTitle.textContent = "Guardado sin conexión";
+      elReceiptTitle.textContent = "Guardado localmente";
       elReceiptSubtitle.textContent =
-        "La hora exacta ya quedó registrada. Se enviará automáticamente al SharePoint apenas vuelva la señal.";
-    } else if (!CFG.webhookUrl) {
+        "La hora exacta quedó guardada. Se enviará automáticamente cuando el webhook responda correctamente.";
+    } else if (!webhookUrl) {
       elReceiptIcon.textContent = "✓";
       elReceiptIcon.classList.remove("queued");
       elReceiptTitle.textContent = "Marcación registrada (Demo)";

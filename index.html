@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#2563eb" />
   <title>Registro de Traslados QR</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
   <main class="app-shell">
@@ -34,13 +34,29 @@
       </div>
     </section>
 
-    <div id="sync-banner" class="sync-banner" hidden>
-      <span id="sync-banner-text"></span>
-      <button type="button" id="retry-sync-btn" class="btn-link">Reintentar</button>
+    <div id="sync-banner" class="banner banner-warning" hidden>
+      <div class="banner-body">
+        <strong id="sync-banner-text"></strong>
+        <small id="sync-banner-detail" class="banner-detail" hidden></small>
+      </div>
+      <div class="banner-actions">
+        <button type="button" id="retry-sync-btn" class="btn-link">Reintentar</button>
+        <button type="button" id="clear-queue-btn" class="btn-link btn-link-muted">Descartar</button>
+      </div>
     </div>
 
-    <div id="demo-banner" class="demo-banner" hidden>
-      Modo Demo activo (sin SharePoint conectado aún). Los registros se guardan localmente para pruebas.
+    <div id="config-banner" class="banner banner-warning" hidden>
+      <div class="banner-body">
+        <strong>Webhook de Power Automate incompleto</strong>
+        <small id="config-banner-detail" class="banner-detail"></small>
+      </div>
+    </div>
+
+    <div id="demo-banner" class="banner banner-info" hidden>
+      <div class="banner-body">
+        <strong>Modo Demo activo</strong>
+        <small class="banner-detail">Sin SharePoint conectado aún. Los registros se guardan solo localmente.</small>
+      </div>
     </div>
 
     <form id="marcacion-form" class="card" novalidate>
@@ -138,7 +154,7 @@
     </footer>
   </main>
 
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

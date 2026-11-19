@@ -1,4 +1,4 @@
-const CACHE_NAME = "qr-marcacion-v1";
+const CACHE_NAME = "qr-marcacion-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -26,35 +26,26 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first para todos los recursos locales:
+// Si hay internet siempre obtiene la versión más reciente al refrescar;
+// si el usuario está sin señal, responde desde la caché offline.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for config.js and HTML so updates apply quickly when online
-  if (url.pathname.endsWith("config.js") || url.pathname.endsWith(".html") || url.pathname.endsWith("/")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
+  event.respondWith(
+    fetch(event.request, { cache: "no-cache" })
+      .then((response) => {
+        if (response && response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((res) => res || caches.match("./index.html")))
-    );
-    return;
-  }
-
-  // Cache-first for static assets
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
-      });
-    })
+      })
+      .catch(() =>
+        caches.match(event.request).then((cached) => cached || caches.match("./index.html"))
+      )
   );
 });

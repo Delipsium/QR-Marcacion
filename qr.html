@@ -6,12 +6,19 @@
   <title>Generador de QR Imprimible - Registro de Traslados</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --surface: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --primary: #3b82f6;
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-subtle: #f8fafc;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --muted: #475569;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+      --warning-text: #92400e;
+      --shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -21,10 +28,11 @@
       padding: 24px;
       display: flex;
       justify-content: center;
+      min-height: 100vh;
     }
     .layout {
       width: 100%;
-      max-width: 820px;
+      max-width: 840px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 24px;
@@ -37,29 +45,46 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 20px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
       gap: 14px;
+      box-shadow: var(--shadow);
     }
-    h1 { font-size: 1.3rem; }
+    h1 { font-size: 1.35rem; font-weight: 800; }
     p { font-size: 0.9rem; color: var(--muted); line-height: 1.45; }
-    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; }
+    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text); }
     input {
       width: 100%;
-      background: var(--bg);
+      background: var(--surface-subtle);
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--border-strong);
       border-radius: 10px;
       padding: 11px 12px;
       font-size: 0.95rem;
+      outline: none;
+    }
+    input:focus {
+      background: var(--surface);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+    }
+    .url-warning {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      line-height: 1.4;
     }
     .actions {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
     }
-    button {
+    button,
+    .btn-anchor {
       flex: 1;
       padding: 12px 14px;
       border-radius: 10px;
@@ -67,9 +92,17 @@
       font-weight: 700;
       font-size: 0.92rem;
       cursor: pointer;
+      text-align: center;
+      text-decoration: none;
     }
     .btn-primary { background: var(--primary); color: #fff; }
-    .btn-secondary { background: #334155; color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary {
+      background: var(--surface-subtle);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .btn-secondary:hover { background: #e2e8f0; }
 
     /* Tarjeta imprimible */
     .print-card {
@@ -82,11 +115,12 @@
       flex-direction: column;
       align-items: center;
       gap: 12px;
-      border: 2px dashed #cbd5e1;
+      border: 2px dashed var(--border-strong);
+      box-shadow: var(--shadow);
     }
     .print-card h2 { font-size: 1.35rem; font-weight: 800; }
     .print-card .movil-tag {
-      background: #0f172a;
+      background: var(--primary);
       color: #ffffff;
       padding: 4px 14px;
       border-radius: 999px;
@@ -112,7 +146,7 @@
       line-height: 1.5;
     }
     .url-preview {
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       color: #64748b;
       word-break: break-all;
     }
@@ -121,7 +155,7 @@
       body { background: #ffffff; padding: 0; }
       .no-print { display: none !important; }
       .layout { display: block; max-width: 420px; margin: 24px auto; }
-      .print-card { border: 2px solid #0f172a; }
+      .print-card { border: 2px solid #0f172a; box-shadow: none; }
     }
   </style>
 </head>
@@ -130,13 +164,15 @@
     <section class="panel no-print">
       <h1>Generador de QR Imprimible</h1>
       <p>
-        Crea el código QR una sola vez, imprímelo y pégalo en el móvil. Al escanearlo, cada pasajero abrirá el formulario con la fecha y hora automática.
+        Crea el código QR una sola vez, imprímelo y pégalo en el móvil. Al escanearlo, cada pasajero abrirá el formulario con fecha y hora automática.
       </p>
 
       <div>
-        <label for="base-url">URL donde publicaste el formulario</label>
-        <input id="base-url" type="url" placeholder="https://tu-usuario.github.io/QR-Marcacion/" />
+        <label for="base-url">URL pública donde publicaste el formulario</label>
+        <input id="base-url" type="url" placeholder="https://delipsium.github.io/QR-Marcacion/" />
       </div>
+
+      <div id="url-warning" class="url-warning" hidden></div>
 
       <div>
         <label for="movil-id">Nombre o Patente del Móvil (opcional)</label>
@@ -150,7 +186,8 @@
 
       <div class="actions">
         <button type="button" id="download-btn" class="btn-primary">Descargar PNG</button>
-        <button type="button" id="print-btn" class="btn-secondary">Imprimir Cartel</button>
+        <button type="button" id="print-btn" class="btn-secondary">Imprimir</button>
+        <a id="test-link" class="btn-anchor btn-secondary" href="#" target="_blank" rel="noopener">Probar URL</a>
       </div>
     </section>
 
@@ -167,29 +204,34 @@
     </section>
   </div>
 
-  <script src="qrcode-local.js"></script>
+  <script src="qrcode-local.js?v=2"></script>
   <script>
     const elBaseUrl = document.getElementById("base-url");
     const elMovilId = document.getElementById("movil-id");
     const elCardTitle = document.getElementById("card-title");
+    const elUrlWarning = document.getElementById("url-warning");
     const elPreviewTitle = document.getElementById("preview-title");
     const elPreviewMovil = document.getElementById("preview-movil");
     const elPreviewUrl = document.getElementById("preview-url");
     const elQrContainer = document.getElementById("qr-container");
     const elDownloadBtn = document.getElementById("download-btn");
     const elPrintBtn = document.getElementById("print-btn");
+    const elTestLink = document.getElementById("test-link");
 
-    // Sugerir URL actual si está publicado, o la de GitHub Pages del repo
-    if (window.location.protocol.startsWith("http")) {
+    // Sugerir URL actual si está publicado en http/https, o la de GitHub Pages del repo
+    if (window.location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
       elBaseUrl.value = window.location.href.replace(/qr\.html.*$/, "");
     } else {
       elBaseUrl.value = "https://delipsium.github.io/QR-Marcacion/";
     }
 
     function buildTargetUrl() {
-      const base = (elBaseUrl.value || "").trim();
+      let base = (elBaseUrl.value || "").trim();
       const movil = (elMovilId.value || "").trim();
       if (!base) return "";
+      if (!/^https?:\/\//i.test(base)) {
+        base = "https://" + base;
+      }
       try {
         const url = new URL(base);
         if (movil) {
@@ -201,11 +243,30 @@
       }
     }
 
+    function updateUrlWarning(targetUrl) {
+      if (!targetUrl) {
+        elUrlWarning.hidden = true;
+        return;
+      }
+      try {
+        const parsed = new URL(targetUrl);
+        if (["localhost", "127.0.0.1"].includes(parsed.hostname)) {
+          elUrlWarning.textContent =
+            "Atención: un celular externo no puede conectarse a localhost. Usa tu URL pública (ej. GitHub Pages).";
+          elUrlWarning.hidden = false;
+          return;
+        }
+      } catch (_) {}
+      elUrlWarning.hidden = true;
+    }
+
     function renderQR() {
       const targetUrl = buildTargetUrl();
       const movil = (elMovilId.value || "").trim();
       elPreviewTitle.textContent = (elCardTitle.value || "Registro de Viaje").trim();
       elPreviewUrl.textContent = targetUrl;
+      elTestLink.href = targetUrl || "#";
+      updateUrlWarning(targetUrl);
 
       if (movil) {
         elPreviewMovil.textContent = movil;
@@ -225,7 +286,7 @@
         window.LocalQRCode.drawToCanvas(canvas, targetUrl, { width: 512, margin: 4 });
         elQrContainer.appendChild(canvas);
       } catch (err) {
-        elQrContainer.innerHTML = `<p style='color:#ef4444;font-size:0.85rem;'>Error al generar el QR: ${err.message}</p>`;
+        elQrContainer.innerHTML = `<p style='color:#dc2626;font-size:0.85rem;'>Error al generar el QR: ${err.message}</p>`;
       }
     }
 
